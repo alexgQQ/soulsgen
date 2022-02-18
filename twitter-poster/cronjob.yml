@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: soulsgen-twitter
+spec:
+  schedule: "0 */4 * * *"  # Run every 4 hours
+  successfulJobsHistoryLimit: 0  # Remove successfull runs
+  failedJobsHistoryLimit: 3  # Save last 3 failed runs
+  jobTemplate:
+    spec:
+      backoffLimit: 3  # Stop retrying after 3 failed runs
+      template:
+        spec:
+          containers:
+          - name: soulsgen-twitter
+            image: $TWITTER_IMAGE_NAME
+            imagePullPolicy: IfNotPresent
+            env:
+              - name: TORCHSERVE_ENDPOINT
+                value: $TORCHSERVE_ENDPOINT
+              - name: TWITTER_ACCESS_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: twitter-oauth
+                    key: TWITTER_ACCESS_TOKEN
+              - name: TWITTER_CONSUMER_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: twitter-oauth
+                    key: TWITTER_CONSUMER_KEY
+              - name: TWITTER_CONSUMER_SECRET
+                valueFrom:
+                  secretKeyRef:
+                    name: twitter-oauth
+                    key: TWITTER_CONSUMER_SECRET
+              - name: TWITTER_TOKEN_SECRET
+                valueFrom:
+                  secretKeyRef:
+                    name: twitter-oauth
+                    key: TWITTER_TOKEN_SECRET
+          restartPolicy: OnFailure
