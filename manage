@@ -75,9 +75,13 @@ function build_corpus() {
   build_expanda_config
   (cd dataset && poetry run expanda build)
   cp dataset/build/vocab.txt serve-handler/assets/vocab.txt
-  poetry run python -m extension.words \
+  poetry run python -m extension.inspect \
     --source_text dataset/build/corpus.raw.txt \
-    --output_path  serve-handler/assets/corpus.txt
+    --output_path  serve-handler/assets/corpus.txt \
+    --words-export
+  poetry run python -m extension.inspect \
+    --source_text dataset/build/corpus.raw.txt \
+    --output_path  dataset/build/report.html
 }
 
 function upload_corpus() {
@@ -218,6 +222,7 @@ case $ACTION in
     echo "Removing txt files, pth files, mar files and the base expanda config..."
     rm -rf serve-handler/**/*.txt
     rm -rf dataset/**/*.txt
+    rm -rf dataset/build/*.html
     rm -rf **/*.pth
     rm -rf **/*.mar
     rm -rf $EXPANDA_CONFIG

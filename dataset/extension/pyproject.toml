@@ -6,6 +6,14 @@ authors = ["alexgQQ <alex.grand@beatport.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+scikit-learn = "^1.0.2"
+seaborn = "^0.11.2"
+matplotlib = "^3.5.1"
+numpy = "^1.22.2"
+pandas = "^1.4.1"
+Jinja2 = "^3.0.3"
+spacy = "^3.2.3"
+nltk = "^3.7"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
