@@ -13,6 +13,8 @@ A few env configs must be provided as well, I recommend to make a .env file as b
 # Can take these as is
 export GPT2_VOCAB_PATH=serve-handler/assets/vocab.txt
 export GPT2_CORPUS_PATH=serve-handler/assets/corpus.txt
+export TRAINER_NAME=soulsgen-trainer
+export TRAINER_ZONE=us-central1-a
 
 # Replace this with registry named location for ez use
 export TWITTER_IMAGE_NAME=soulsgen-twitter:latest

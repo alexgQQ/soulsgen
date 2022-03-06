@@ -19,11 +19,12 @@ cd src
                        --eval_corpus /dataset/build/corpus.test.txt \
                        --vocab_path /dataset/build/vocab.txt \
                        --save_checkpoint_path ckpt.pth \
-                       --save_model_path latest.pth \
+                       --save_model_path model.pth \
                        --batch_train 128 \
                        --batch_eval 128 \
                        --seq_len 64 \
                        --total_steps 1000 \
                        --eval_steps 100 \
                        --save_steps 100 --gpus 1
-gsutil cp gpt2-pretrained.pth $BUCKET/models/soulsgen/latest/model.pth
+gsutil cp model.pth $BUCKET/models/soulsgen/latest/model.pth
+gcloud --quiet compute instances delete $TRAINER_NAME --zone=$TRAINER_ZONE
