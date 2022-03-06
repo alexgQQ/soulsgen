@@ -236,6 +236,8 @@ case $ACTION in
     poetry install || true
     poetry run pip install Cython
     poetry install
+    # Pull spacy eng parsing model data
+    poetry run python -m spacy download en_core_web_sm
     ;;
   *)
     echo "Command not understood."
