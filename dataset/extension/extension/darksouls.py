@@ -34,7 +34,6 @@ def clean_text_entry(entry: str):
     entry = _clear_formatting(entry)
     for i in range(1, 16):
         entry.replace(f"+{i}", "")
-    # entry = _split_sentences(entry)
 
     return entry
 
@@ -63,8 +62,6 @@ def traverse_text(entries_elem):
     delimeters = (
         ".", "?", "!", ",", "..."
     )
-    prev_text = ""
-    append_flag = False
     for text_elem in entries_elem:
         text = text_elem.text
         if any((text == ignore for ignore in to_ignore)):
@@ -76,22 +73,11 @@ def traverse_text(entries_elem):
         text = clean_text_entry(text)
         if len(text) < 5 or len(text.split()) < 1:
             continue
-        # for sentence in text:
-        #     if any((sentence == entry for entry in entries)):
-        #         continue
-        if text.endswith(","):
-            append_flag = True
-            if prev_text:
-                prev_text += f" {text}"
-            else:
-                prev_text += text
-        else:
-            if append_flag:
-                text = f"{prev_text} {text}"
-                prev_text = ""
-                append_flag = False
-            entries.append(text)
-    return entries
+        entries.append(text)
+    # Strip duplicates, not sure if this is something proper
+    # but some of the documents have lots of duplicated statements
+    entries = set(entries)
+    return list(entries)
 
 
 def parse_xml(xml_file):
@@ -123,12 +109,14 @@ def handle_ds_export(
     nltk.data.find("tokenizers/punkt")
     tokenize_sentence = nltk.tokenize.sent_tokenize
 
+    # Get all the entries as a single string
+    # so the whole doc can be tokenized properly
     sentences = parse_xml(input_file)
+    text = " ".join(sentences)
+
     with open(output_file, "w", encoding="utf-8") as dst:
-        for sentence in sentences:
-            for tk_sentence in tokenize_sentence(sentence):
-                tk_sentence = tk_sentence.strip()
-                dst.write(tk_sentence + "\n")
+        for tk_sentence in tokenize_sentence(text):
+            dst.write(tk_sentence + "\n")
 
 
 __extension__ = {
