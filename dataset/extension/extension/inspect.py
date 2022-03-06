@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import spacy
 import nltk
+from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import seaborn as sns
 from sklearn.feature_extraction.text import CountVectorizer
@@ -40,7 +41,7 @@ def load_dataset(filename: str) -> pd.Series:
     return dataframe["text"]
 
 
-def strip_outliers(series: pd.Series):
+def strip_outliers(series: pd.Series) -> pd.Series:
     """Filter outliers that are 3 standard deviations from the mean"""
     return series[((series - series.mean()) / series.std()).abs() < 3]
 
@@ -74,7 +75,7 @@ class Analyzer:
             for entity in doc.ents:
                 self.entities[entity.label_].update([entity.text])
 
-            for text, pos in nltk.pos_tag(text.split()):
+            for text, pos in nltk.pos_tag(word_tokenize(text)):
                 self.pos_tags[pos].update([text])
 
             # Spacy POS taggin does recognize any tags for some reason
@@ -101,10 +102,14 @@ class Analyzer:
 
     @property
     def word_count(self):
-        return self.dataset.str.split().map(lambda x: len(x))
+        return self.dataset.apply(self._word_filter).str.split().map(lambda x: len(x))
+
+    @staticmethod
+    def _word_filter(text):
+        return text.replace(".", "").replace("?", "").replace("!", "").replace(",", "")
 
     def _word_gen(self):
-        for sent in self.dataset.str.split().array:
+        for sent in self.dataset.apply(self._word_filter).str.split().array:
             for word in sent:
                 yield word
 
@@ -116,7 +121,7 @@ class Analyzer:
     def unique_words(self):
         word_set = set()
         for word in self.words:
-            word_set |= set([word])
+            word_set |= set([word.lower()])
         return word_set
 
     @property
