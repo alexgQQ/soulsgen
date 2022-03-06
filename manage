@@ -66,7 +66,7 @@ function build_expanda_config() {
   cp $EXPANDA_BASE_CONFIG $EXPANDA_CONFIG
   FILES="$(find $DATASOURCE_DIR -type f -name '*.xml')"
   for file in $FILES; do
-      echo "    --extension.darksouls $file" >> $EXPANDA_CONFIG
+      echo "    --soulsgen.parse $file" >> $EXPANDA_CONFIG
   done
 }
 
@@ -75,11 +75,11 @@ function build_corpus() {
   build_expanda_config
   (cd dataset && poetry run expanda build)
   cp dataset/build/vocab.txt serve-handler/assets/vocab.txt
-  poetry run python -m extension.inspect \
+  poetry run python -m soulsgen.inspect \
     --source_text dataset/build/corpus.raw.txt \
     --output_path  serve-handler/assets/corpus.txt \
     --words-export
-  poetry run python -m extension.inspect \
+  poetry run python -m soulsgen.inspect \
     --source_text dataset/build/corpus.raw.txt \
     --output_path  dataset/build/report.html
 }

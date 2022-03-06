@@ -18,7 +18,7 @@ torch-model-archiver = "^0.5.2"
 regex = "^2022.1.18"
 matplotlib = "^3.5.1"
 tqdm = "^4.62.3"
-extension = {path = "dataset/extension", develop = true}
+soulsgen = {path = "dataset/extension", develop = true}
 # The below packages are only installed to support the above package
 pyinstrument = "^4.1.1"
 scikit-learn = "^1.0.2"
