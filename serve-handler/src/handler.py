@@ -137,16 +137,35 @@ class GPT2Handler(BaseHandler):
         # Sample from filtered distribution.
         return indices[probs.multinomial(1)[0]].item()
 
-    def preprocess(self, data):
-        pass
-
-    def inference(self, data, *args, **kwargs):
+    def _random_word(self) -> str:
         line_gen = (
             line.strip("\n") for line in open(self.corpus_path, "r+", encoding="utf-8")
         )
-        word = random.choice(list(line_gen))
-        return self.generate(word)
+        return random.choice(list(line_gen))
+
+    def preprocess(self, data):
+        batch_data = []
+        for entry in data:
+            context = None
+            # images python version not compatible with walrus :(
+            body = entry.get("body")
+            if body:
+                context = body.get("context")
+            if context is None:
+                # would be good to decouple this down the road
+                # could remove a related asset for random word file
+                context = self._random_word()
+            batch_data.append(context)
+        return batch_data
+
+    def inference(self, data, *args, **kwargs):
+        inferences = []
+        for context in data:
+            inferences.append(self.generate(context))
+        return inferences
 
     def postprocess(self, inference_output):
-        result = inference_output.replace("<s>", "").replace("</s>", "").strip()
-        return [{"result": result}]
+        results = []
+        for result in inference_output:
+            results.append(result.replace("<s>", "").replace("</s>", "").strip())
+        return [{ "result": result } for result in results]
