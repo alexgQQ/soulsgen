@@ -84,6 +84,16 @@ function build_corpus() {
     --output_path  dataset/build/report.html
 }
 
+function build_sentence_report() {
+  poetry run python -m soulsgen.generate \
+    --source-size $(wc -l < dataset/build/corpus.raw.txt) \
+    --output-file  generated.txt \
+    --host $TORCHSERVE_ENDPOINT
+  poetry run python -m soulsgen.inspect \
+    --source_text generated.txt \
+    --output_path report.html
+}
+
 function upload_corpus() {
   zip -r corpus.zip dataset/build
   gsutil cp corpus.zip $UPLOAD_LOCATION
@@ -150,6 +160,10 @@ case $ACTION in
       cronjob)
         echo "Creating twitter cronjob..."
         deploy_cronjob
+        ;;
+      report)
+        echo "Creating generated sentences and report..."
+        build_sentence_report
         ;;
       image)
         echo "Creating twitter poster image..."

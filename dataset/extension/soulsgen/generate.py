@@ -50,8 +50,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--host",
-        required=False,
-        default="127.0.0.1:8080",
+        required=True,
         help="Host and port for the torchserve instance.",
     )
     parser.add_argument(
@@ -66,20 +65,13 @@ if __name__ == "__main__":
         default=0.1,
         help="Sample size of sentences to generate from source text.",
     )
-    parser.add_argument(
-        "--use-ssl",
-        action="store_true",
-        help="Use ssl for the torchserve host",
-    )
     args = parser.parse_args()
 
     batch_size = args.batch_size
     output_file = args.output_file
     source_total = args.source_size 
     target_size = int(source_total * args.sample_size)
-    protocol = "http" if not args.use_ssl else "https"
-    url = f"{protocol}://{args.host}/predictions/soulsgen"
-    urls = [url for _ in range(batch_size)]
+    urls = [args.host for _ in range(batch_size)]
 
     data = []
     for _ in trange(target_size // batch_size):
