@@ -61,11 +61,7 @@ class GPT2Handler(BaseHandler):
             if torch.cuda.is_available() and properties.get("gpu_id") is not None
             else "cpu"
         )
-        self.device = torch.device(
-            self.map_location + ":" + str(properties.get("gpu_id"))
-            if torch.cuda.is_available() and properties.get("gpu_id") is not None
-            else self.map_location
-        )
+        self.device = torch.device("cuda:" + str(properties.get("gpu_id")) if torch.cuda.is_available() else "cpu")
         self.manifest = context.manifest
 
         model_dir = properties.get("model_dir")
@@ -119,11 +115,11 @@ class GPT2Handler(BaseHandler):
             x, offset=past[0][0].size(-2) if past is not None else 0
         )
 
-        # if self.config.use_gpu:
-        #     logits, past = self.model(x.cuda(), past)
-        #     logits = logits.cpu().float()
-        # else:
-        logits, past = self.model(x, past)
+        if torch.cuda.is_available():
+            logits, past = self.model(x.cuda(), past)
+            logits = logits.cpu().float()
+        else:
+            logits, past = self.model(x, past)
 
         return logits[-1, :].softmax(-1), past
 
