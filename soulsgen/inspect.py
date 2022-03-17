@@ -1,19 +1,20 @@
-import argparse
-import os
 import base64
 from collections import Counter, defaultdict
 from io import BytesIO
-
+import os
+from typing import Generator, Set, List, Tuple
 import webbrowser
-import pandas as pd
+
+import click
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 import matplotlib.pyplot as plt
-import spacy
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+import pandas as pd
 import seaborn as sns
 from sklearn.feature_extraction.text import CountVectorizer
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+import spacy
 
 
 def init_nltk():
@@ -47,6 +48,12 @@ def strip_outliers(series: pd.Series) -> pd.Series:
 
 
 class Analyzer:
+    """
+    Class to handle data analysis of a set of sentences.
+    This will gather word and character lengths, common stopwords,
+    common non-stopwords, common entities, parts of speech and ngrams.
+    """
+
     def __init__(self, dataset: pd.Series, skip_nlp: bool = False):
         self.dataset = dataset
         if not skip_nlp:
@@ -97,45 +104,45 @@ class Analyzer:
         self.pos_tag_counts = Counter(pos_tag_counts)
 
     @property
-    def char_lengths(self):
+    def char_lengths(self) -> pd.Series:
         return self.dataset.str.len()
 
     @property
-    def word_count(self):
+    def word_count(self) -> pd.Series:
         return self.dataset.apply(self._word_filter).str.split().map(lambda x: len(x))
 
     @staticmethod
-    def _word_filter(text):
+    def _word_filter(text) -> str:
         return text.replace(".", "").replace("?", "").replace("!", "").replace(",", "")
 
-    def _word_gen(self):
+    def _word_gen(self) -> str:
         for sent in self.dataset.apply(self._word_filter).str.split().array:
             for word in sent:
                 yield word
 
     @property
-    def words(self):
+    def words(self) -> Generator[str, None, None]:
         return (word for word in self._word_gen())
 
     @property
-    def unique_words(self):
+    def unique_words(self) -> Set[str]:
         word_set = set()
         for word in self.words:
             word_set |= set([word.lower()])
         return word_set
 
     @property
-    def stopwords(self):
+    def stopwords(self) -> Generator[str, None, None]:
         return (word.lower() for word in self.words if word.lower() in self.stop)
 
-    def top_stopwords(self, top: int = 10):
+    def top_stopwords(self, top: int = 10) -> Counter:
         return Counter(self.stopwords).most_common(top)
 
     @property
-    def non_stopwords(self):
+    def non_stopwords(self) -> Generator[str, None, None]:
         return (word.lower() for word in self.words if word.lower() not in self.stop)
 
-    def top_non_stopwords(self, top: int = 10):
+    def top_non_stopwords(self, top: int = 10) -> Counter:
         return Counter(self.non_stopwords).most_common(top)
 
     def top_ngram(self, n_value: int, limit: int = 10):
@@ -148,25 +155,28 @@ class Analyzer:
         words_freq = sorted(words_freq, key=lambda x: x[1], reverse=True)
         return words_freq[:limit]
 
-    def top_name_entities(self, top: int = 10):
+    def top_name_entities(self, top: int = 10) -> List[Tuple[str, int]]:
         return self.entity_counts.most_common(top)
 
-    def top_parts_of_speech(self, top: int = 10):
+    def top_parts_of_speech(self, top: int = 10) -> List[Tuple[str, int]]:
         return self.pos_tag_counts.most_common(top)
 
 
 class Renderer:
+    """
+    Class to handle template and plot generation. Uses Jinja to render
+    to a simple html file with image plots made through matplotlib.
+    """
+
     def __init__(self, data: Analyzer):
         self.data = data
         self.figure = plt.figure()
         self.jinja_env = Environment(
-            loader=FileSystemLoader(
-                f"{os.getcwd()}/dataset/extension/templates"
-            ),
+            loader=FileSystemLoader(f"{os.getcwd()}/soulsgen/templates"),
             autoescape=select_autoescape(),
         )
 
-    def render_data(self):
+    def render_data(self) -> dict:
         return {
             "length_plots": [
                 self.char_length_hist(),
@@ -212,7 +222,7 @@ class Renderer:
         self.ax_list = self.figure.axes
         self.ax_list[0].set_xlabel(f" Label \n {text}")
 
-    def _count_hist(self, dataset: pd.Series, title: str, xlabel: str):
+    def _count_hist(self, dataset: pd.Series, title: str, xlabel: str) -> str:
         dataset.hist()
         plt.xlabel(xlabel)
         plt.title(title)
@@ -240,21 +250,21 @@ class Renderer:
         dataset = self.data.dataset.str.split().map(lambda x: len(x))
         return self._count_hist(dataset, "Word Count per Sentence", "Word Count")
 
-    def plot_top_stopwords_barchart(self):
+    def plot_top_stopwords_barchart(self) -> str:
         x, y = map(list, zip(*self.data.top_stopwords()))
         sns.barplot(x=y, y=x)
         plt.title("Top Stopwords")
         plt.tight_layout()
         return self.figure_to_image()
 
-    def plot_top_non_stopwords_barchart(self):
+    def plot_top_non_stopwords_barchart(self) -> str:
         x, y = map(list, zip(*self.data.top_non_stopwords()))
         sns.barplot(x=y, y=x)
         plt.title(f"Top Non-Stopwords")
         plt.tight_layout()
         return self.figure_to_image()
 
-    def plot_top_ngrams_barchart(self, num: int):
+    def plot_top_ngrams_barchart(self, num: int) -> str:
         top_ngrams = self.data.top_ngram(n_value=num)
         x, y = map(list, zip(*top_ngrams))
         sns.barplot(x=y, y=x)
@@ -266,14 +276,14 @@ class Renderer:
         plt.tight_layout()
         return self.figure_to_image()
 
-    def plot_named_entity_barchart(self):
+    def plot_named_entity_barchart(self) -> str:
         x, y = map(list, zip(*self.data.top_name_entities()))
         sns.barplot(x=y, y=x)
         plt.title(f"Top Named Entities")
         plt.tight_layout()
         return self.figure_to_image()
 
-    def plot_named_entity_words_barchart(self, num: int = 1):
+    def plot_named_entity_words_barchart(self, num: int = 1) -> str:
         top_entity = self.data.top_name_entities(num)[num - 1][0]
         x, y = map(list, zip(*self.data.entities[top_entity].most_common(10)))
         sns.barplot(x=y, y=x)
@@ -281,14 +291,14 @@ class Renderer:
         plt.tight_layout()
         return self.figure_to_image()
 
-    def plot_parts_of_speach_barchart(self):
+    def plot_parts_of_speach_barchart(self) -> str:
         x, y = map(list, zip(*self.data.top_parts_of_speech()))
         sns.barplot(x=y, y=x)
         plt.title(f"Top Parts of Speech")
         plt.tight_layout()
         return self.figure_to_image()
 
-    def plot_named_parts_of_speach_barchart(self, num: int = 1):
+    def plot_named_parts_of_speach_barchart(self, num: int = 1) -> str:
         top_pos = self.data.top_parts_of_speech(num)[num - 1][0]
         x, y = map(list, zip(*self.data.pos_tags[top_pos].most_common(10)))
         sns.barplot(x=y, y=x)
@@ -297,51 +307,74 @@ class Renderer:
         return self.figure_to_image()
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog="inspect",
-        description="""
-            Script to perform operations on a processed dataset.
-            By default this will generate a short report on various information on the datset.
-            With the `words_export` flag this will create a txt file of unique words in the dataset.
-        """,
-    )
-    parser.add_argument(
-        "--source_text",
-        required=True,
-        help="Source text document of sentences separated by newlines",
-    )
-    parser.add_argument(
-        "--output_path", required=True, help="Filepath for the output file"
-    )
-    parser.add_argument(
-        "--words-export",
-        action="store_true",
-        help="Flag to export unique words to the given output path",
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Flag to open corpus report in the browser",
-    )
-    args = parser.parse_args()
+@click.command()
+@click.option(
+    "--source-text",
+    "-s",
+    required=True,
+    help="txt file of sentences to read from",
+    type=click.Path(exists=True, dir_okay=False),
+)
+@click.option(
+    "--output-file",
+    "-o",
+    required=True,
+    help="file path for where to save the words",
+    type=click.Path(exists=False, dir_okay=False),
+)
+@click.option(
+    "--interactive", "-i", is_flag=True, help="opens the generated report in a browser"
+)
+def inspect(source_text, output_file, interactive):
+    """
+    Command to inspect a set of sentences and generate a visual report. This will visualize
+    things like word lengths, parts of speech occurences, word patterns and named entities.
+    """
 
-    dataset = load_dataset(args.source_text)
-    output_path = args.output_path
+    dataset = load_dataset(source_text)
+    processed = Analyzer(dataset)
+    renderer = Renderer(processed)
 
-    if args.words_export:
-        processed = Analyzer(dataset, skip_nlp=True)
-        with open(output_path, "a") as file_obj:
-            for word in processed.unique_words:
-                file_obj.write(f"{word}\n")
-    else:
-        processed = Analyzer(dataset)
-        renderer = Renderer(processed)
+    if os.path.exists(output_file):
+        os.remove(output_file)
 
-        if os.path.exists(output_path):
-            os.remove(output_path)
+    renderer.render_to_file(output_file)
 
-        renderer.render_to_file(output_path)
+    click.echo(f"Saved report to {output_file}")
 
-        if args.interactive:
-            webbrowser.open(f"file://{os.path.abspath(output_path)}")
+    if interactive:
+        webbrowser.open(f"file://{os.path.abspath(output_file)}")
+
+
+@click.command()
+@click.option(
+    "--source-text",
+    "-s",
+    required=True,
+    help="txt file of sentences to read from",
+    type=click.Path(exists=True, dir_okay=False),
+)
+@click.option(
+    "--output-file",
+    "-o",
+    required=True,
+    help="file path for where to save the words",
+    type=click.Path(exists=False, dir_okay=False),
+)
+def words(source_text, output_file):
+    """
+    Command to extract unique words from a set of sentences. Pulls words from a file of
+    sentences separated by newlines and saves a file of the unique words separated by newlines.
+    """
+    dataset = load_dataset(source_text)
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    processed = Analyzer(dataset, skip_nlp=True)
+    unique_words = processed.unique_words
+    with open(output_file, "w") as file_obj:
+        for word in unique_words:
+            file_obj.write(f"{word}\n")
+
+    click.echo(f"Saved {len(unique_words)} words to {output_file}")

@@ -75,23 +75,22 @@ function build_corpus() {
   build_expanda_config
   (cd dataset && poetry run expanda build)
   cp dataset/build/vocab.txt serve-handler/assets/vocab.txt
-  poetry run python -m soulsgen.inspect \
-    --source_text dataset/build/corpus.raw.txt \
-    --output_path  serve-handler/assets/corpus.txt \
-    --words-export
-  poetry run python -m soulsgen.inspect \
-    --source_text dataset/build/corpus.raw.txt \
-    --output_path  dataset/build/report.html
+  poetry run words \
+    --source-text dataset/build/corpus.raw.txt \
+    --output-file  serve-handler/assets/corpus.txt
+  poetry run inspect \
+    --source-text dataset/build/corpus.raw.txt \
+    --output-file  dataset/build/report.html
 }
 
 function build_sentence_report() {
-  poetry run python -m soulsgen.generate \
+  poetry run generate \
     --source-size $(wc -l < dataset/build/corpus.raw.txt) \
-    --output-file  generated.txt \
+    --output-file generated.txt \
     --host $TORCHSERVE_ENDPOINT
-  poetry run python -m soulsgen.inspect \
-    --source_text generated.txt \
-    --output_path report.html
+  poetry run inspect \
+    --source-text generated.txt \
+    --output-file report.html
 }
 
 function upload_corpus() {
