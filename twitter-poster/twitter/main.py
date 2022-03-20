@@ -4,40 +4,13 @@ Gathers source text and post to twitter
 Gives utility function to generate access keys for authorization.
 """
 
+import os
 from typing import Dict, Any, Optional
-import logging
 import sys
-import argparse
 from requests_oauthlib import OAuth1Session  # pylint: disable=E0401
-from pydantic import BaseSettings  # pylint: disable=E0401
 import requests
-
-logging.basicConfig(level="INFO")
-
-
-class BaseConfig(BaseSettings):  # pylint: disable=R0903
-    """Basic configuration required for any action"""
-
-    twitter_consumer_key: str
-    twitter_consumer_secret: str
-
-
-class GenerateConfig(BaseConfig):  # pylint: disable=R0903
-    """Configuration required for Twitter authorization"""
-
-    twitter_request_token_url: str = "https://api.twitter.com/oauth/request_token?oauth_callback=oob&x_auth_access_type=write"
-    twitter_authorization_url: str = "https://api.twitter.com/oauth/authorize"
-    twitter_access_token_url: str = "https://api.twitter.com/oauth/access_token"
-
-
-class PostConfig(BaseConfig):  # pylint: disable=R0903
-    """Configuration required for Twitter posting"""
-
-    torchserve_endpoint: str
-    twitter_post_url: str = "https://api.twitter.com/2/tweets"
-
-    twitter_access_token: str
-    twitter_token_secret: str
+import click
+from dotenv import load_dotenv
 
 
 def post_handler(handler: Any, url: str, payload: Optional[Dict] = None):
@@ -47,95 +20,157 @@ def post_handler(handler: Any, url: str, payload: Optional[Dict] = None):
         response.raise_for_status()
         return response.json()
     except requests.HTTPError as err:
-        logging.info("Http Error Received from %s: %s", url, err)
+        click.echo(f"Http Error Received from {url}: {err}")
     except requests.Timeout as err:
-        logging.info("Timeout Connecting to %s: %s", url, err)
+        click.echo(f"Timeout Connecting to {url}: {err}")
     except requests.ConnectionError as err:
-        logging.info("Connection Error from %s: %s", url, err)
+        click.echo(f"Connection Error from {url}: {err}")
     except requests.exceptions.JSONDecodeError as err:
-        logging.info("Error Parsing JSON Response from %s: %s", url, err)
+        click.echo(f"Error Parsing JSON Response from {url}: {err}")
     except Exception as err:  # pylint: disable=W0703
-        logging.info("Unknown Error Posting to %s: %s", url, err)
+        click.echo(f"Unknown Error Posting to {url}: {err}")
     sys.exit(1)
 
 
-def fetch_souls_text() -> Dict:
-    """Fetch generated Dark Souls text from torchserve instance"""
-    config = PostConfig()
-    logging.info("Fetching generated text from %s", config.torchserve_endpoint)
-    return post_handler(requests.post, config.torchserve_endpoint)
-
-
-def twitter_post(message: str) -> Dict:
+def twitter_post(
+    message: str,
+    consumer_key: str,
+    consumer_secret: str,
+    access_token: str,
+    access_secret: str,
+) -> Dict:
     """Post a given message to twitter"""
-    config = PostConfig()
+    twitter_post_url = "https://api.twitter.com/2/tweets"
     oauth = OAuth1Session(
-        config.twitter_consumer_key,
-        client_secret=config.twitter_consumer_secret,
-        resource_owner_key=config.twitter_access_token,
-        resource_owner_secret=config.twitter_token_secret,
+        consumer_key,
+        client_secret=consumer_secret,
+        resource_owner_key=access_token,
+        resource_owner_secret=access_secret,
     )
-    logging.info("Posting twitter message to %s", config.twitter_post_url)
-    return post_handler(oauth.post, config.twitter_post_url, payload={"text": message})
+    return post_handler(oauth.post, twitter_post_url, payload={"text": message})
 
 
-def generate_access_key() -> None:
+def generate_access_key(consumer_key: str, consumer_secret: str) -> None:
     """Create a Oauth1 Access Token Keypair for authorization. Requires user interaction"""
-    config = GenerateConfig()
+    twitter_request_token_url = \
+        "https://api.twitter.com/oauth/request_token?oauth_callback=oob&x_auth_access_type=write"
+    twitter_authorization_url = "https://api.twitter.com/oauth/authorize"
+    twitter_access_token_url = "https://api.twitter.com/oauth/access_token"
 
-    oauth = OAuth1Session(
-        config.twitter_consumer_key, client_secret=config.twitter_consumer_secret
-    )
-    fetch_response = oauth.fetch_request_token(config.twitter_request_token_url)
+    oauth = OAuth1Session(consumer_key, client_secret=consumer_secret)
+    fetch_response = oauth.fetch_request_token(twitter_request_token_url)
 
     resource_owner_key = fetch_response.get("oauth_token")
     resource_owner_secret = fetch_response.get("oauth_token_secret")
 
-    authorization_url = oauth.authorization_url(config.twitter_authorization_url)
-    print("Please go here and authorize: %s" % authorization_url)
-    verifier = input("Paste the PIN here: ")
+    authorization_url = oauth.authorization_url(twitter_authorization_url)
+    click.echo("Please go here to authorize: %s" % authorization_url)
+    verifier = click.prompt("Input Access PIN: ")
 
     oauth = OAuth1Session(
-        config.twitter_consumer_key,
-        client_secret=config.twitter_consumer_secret,
+        consumer_key,
+        client_secret=consumer_secret,
         resource_owner_key=resource_owner_key,
         resource_owner_secret=resource_owner_secret,
         verifier=verifier,
     )
-    oauth_tokens = oauth.fetch_access_token(config.twitter_access_token_url)
+    oauth_tokens = oauth.fetch_access_token(twitter_access_token_url)
 
     access_token = oauth_tokens["oauth_token"]
     access_token_secret = oauth_tokens["oauth_token_secret"]
 
-    print(f"TWITTER_ACCESS_TOKEN={access_token}")
-    print(f"TWITTER_TOKEN_SECRET={access_token_secret}")
+    return access_token, access_token_secret
 
 
-# Internal conflict on whether to change this to click
-# or keep using built in argparse to slim image :D:
+@click.group()
+def cli():
+    """Authenticate and post tweets with twitter"""
+    pass
+
+
+@cli.command()
+@click.option(
+    "--consumer-key",
+    "-k",
+    type=str,
+    help="twitter client consumer key, will read from `TWITTER_CONSUMER_KEY` env var",
+    required=True,
+    envvar="TWITTER_CONSUMER_KEY",
+)
+@click.option(
+    "--consumer-secret",
+    "-s",
+    type=str,
+    help="twitter client consumer secret, will read from `TWITTER_CONSUMER_SECRET` env var",
+    required=True,
+    envvar="TWITTER_CONSUMER_SECRET",
+)
+@click.option(
+    "--access-token",
+    "-a",
+    type=str,
+    help="twitter client access token, will read from `TWITTER_ACCESS_TOKEN` env var",
+    required=True,
+    envvar="TWITTER_ACCESS_TOKEN",
+)
+@click.option(
+    "--access-secret",
+    "-S",
+    type=str,
+    help="twitter client access secret, will read from `TWITTER_TOKEN_SECRET` env var",
+    required=True,
+    envvar="TWITTER_TOKEN_SECRET",
+)
+@click.option(
+    "--torchserve-endpoint",
+    "-t",
+    type=str,
+    help="torchserve inference endpoint, will read from `TORCHSERVE_ENDPOINT` env var",
+    required=True,
+    envvar="TORCHSERVE_ENDPOINT",
+)
+def post(
+    consumer_key, consumer_secret, access_token, access_secret, torchserve_endpoint
+):
+    """Post a generated soulsgen sentence to twitter"""
+    click.echo(f"Fetching a sentence from {torchserve_endpoint}...")
+    sentence = post_handler(requests.post, torchserve_endpoint)
+    sentence = sentence["result"]
+    click.echo(f"Posting `{sentence}` to twitter...")
+    twitter_post(sentence, consumer_key, consumer_secret, access_token, access_secret)
+    click.echo("Done!")
+
+
+@cli.command()
+@click.option(
+    "--consumer-key",
+    "-k",
+    type=str,
+    help="twitter client consumer key, will read from `TWITTER_CONSUMER_KEY` env var",
+    required=True,
+    envvar="TWITTER_CONSUMER_KEY",
+)
+@click.option(
+    "--consumer-secret",
+    "-s",
+    type=str,
+    help="twitter client consumer secret, will read from `TWITTER_CONSUMER_SECRET` env var",
+    required=True,
+    envvar="TWITTER_CONSUMER_SECRET",
+)
+def auth(consumer_key, consumer_secret):
+    """Fetch a access token and secret from twitter, requires user interaction"""
+    click.echo("Authenticating with twitter...")
+    access_token, access_token_secret = generate_access_key(
+        consumer_key, consumer_secret
+    )
+    click.echo(f"Access Token: {access_token}")
+    click.echo(f"Access Token Secret: {access_token_secret}")
+    click.echo("Done! Keep these secret!")
+
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Handle twitter operations for soulsgen."
-    )
-    parser.add_argument(
-        "action",
-        choices=["post", "token"],
-        type=str,
-        help="What operation to run, 'post' to generate a twitter post, \
-            'token' to generate a access token for twitter",
-    )
-    args = parser.parse_args()
-
-    if args.action == "token":
-        logging.info("Generating twitter access token")
-        generate_access_key()
-    elif args.action == "post":
-        logging.info("Beginning soulsgen auto twitter post")
-        sentence = fetch_souls_text()
-        logging.info("Fetched message '%s' from source", sentence["result"])
-        twitter_post(sentence["result"])
-        logging.info("Soulsgen post complete!")
-
-
-if __name__ == "__main__":
-    main()
+    # Funny hack so .env files are loaded locally in dev
+    # and as a standalone
+    load_dotenv(f"{os.getcwd()}/.env")
+    cli()
