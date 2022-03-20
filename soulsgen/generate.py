@@ -45,13 +45,13 @@ def get_file_linecount(filename: str) -> int:
     "-o",
     required=True,
     type=click.Path(exists=False, dir_okay=False),
-    help="file path for where to save the words",
+    help="file path for where to save the sentences",
 )
 @click.option(
     "--host",
     "-h",
     required=True,
-    help="network endpoint for serving torchserve predictions",
+    help="network endpoint for the torchserve instance",
 )
 @click.option(
     "--batch-size",
@@ -68,12 +68,7 @@ def get_file_linecount(filename: str) -> int:
     help="sample size percentage of the original set",
 )
 def generate(source_size, output_file, host, batch_size, sample_size):
-    """
-    Command to create a set of generated sentences from a torchserve instance.
-    This can take some time for a large set of sentences and is usually based
-    off of a set of sentences found in the original dataset.
-    """
-    
+    """Create a set of sentences from a torchserve instance"""
     target_size = int(source_size * sample_size)
     urls = [host for _ in range(batch_size)]
     data = []

@@ -28,7 +28,13 @@ def _clear_slashes_ellipses(data: str) -> str:
 
 def _clear_formatting(data: str) -> str:
     """Remove tabs, replace newlines with a space and condense multiple spaces to a single space"""
-    data = data.replace("\n", " ").replace("\t", "").replace("&s", "").replace("&d", "").replace(":", "")
+    data = (
+        data.replace("\n", " ")
+        .replace("\t", "")
+        .replace("&s", "")
+        .replace("&d", "")
+        .replace(":", "")
+    )
     return re.sub(" +", " ", data).strip()
 
 

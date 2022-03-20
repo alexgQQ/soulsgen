@@ -307,30 +307,7 @@ class Renderer:
         return self.figure_to_image()
 
 
-@click.command()
-@click.option(
-    "--source-text",
-    "-s",
-    required=True,
-    help="txt file of sentences to read from",
-    type=click.Path(exists=True, dir_okay=False),
-)
-@click.option(
-    "--output-file",
-    "-o",
-    required=True,
-    help="file path for where to save the words",
-    type=click.Path(exists=False, dir_okay=False),
-)
-@click.option(
-    "--interactive", "-i", is_flag=True, help="opens the generated report in a browser"
-)
-def inspect(source_text, output_file, interactive):
-    """
-    Command to inspect a set of sentences and generate a visual report. This will visualize
-    things like word lengths, parts of speech occurences, word patterns and named entities.
-    """
-
+def inspect(source_text: str, output_file: str):
     dataset = load_dataset(source_text)
     processed = Analyzer(dataset)
     renderer = Renderer(processed)
@@ -340,13 +317,8 @@ def inspect(source_text, output_file, interactive):
 
     renderer.render_to_file(output_file)
 
-    click.echo(f"Saved report to {output_file}")
 
-    if interactive:
-        webbrowser.open(f"file://{os.path.abspath(output_file)}")
-
-
-@click.command()
+@click.command("inspect")
 @click.option(
     "--source-text",
     "-s",
@@ -358,14 +330,22 @@ def inspect(source_text, output_file, interactive):
     "--output-file",
     "-o",
     required=True,
-    help="file path for where to save the words",
+    help="file path of where to save the report",
     type=click.Path(exists=False, dir_okay=False),
 )
-def words(source_text, output_file):
-    """
-    Command to extract unique words from a set of sentences. Pulls words from a file of
-    sentences separated by newlines and saves a file of the unique words separated by newlines.
-    """
+@click.option(
+    "--interactive", "-i", is_flag=True, help="opens the generated report in a browser"
+)
+def inspect_cli(source_text, output_file, interactive):
+    """Generate a lexical report from a set of sentences"""
+    inspect(source_text, output_file)
+    click.echo(f"Saved report to {output_file}")
+
+    if interactive:
+        webbrowser.open(f"file://{os.path.abspath(output_file)}")
+
+
+def words(source_text, output_file) -> int:
     dataset = load_dataset(source_text)
 
     if os.path.exists(output_file):
@@ -377,4 +357,25 @@ def words(source_text, output_file):
         for word in unique_words:
             file_obj.write(f"{word}\n")
 
-    click.echo(f"Saved {len(unique_words)} words to {output_file}")
+    return len(unique_words)
+
+
+@click.command("words")
+@click.option(
+    "--source-text",
+    "-s",
+    required=True,
+    help="txt file of sentences to read from",
+    type=click.Path(exists=True, dir_okay=False),
+)
+@click.option(
+    "--output-file",
+    "-o",
+    required=True,
+    help="file path for where to save the words",
+    type=click.Path(exists=False, dir_okay=False),
+)
+def words_cli(source_text, output_file):
+    """Extract the unique words from a set of sentences"""
+    count = words(source_text, output_file)
+    click.echo(f"Saved {count} words to {output_file}")

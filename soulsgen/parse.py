@@ -44,24 +44,26 @@ def traverse_text(entries_elem):
     The `any` check is fine but will scale poorly if data is too large.
     """
     entries = []
-    to_ignore = (
-        "%null%",
-        "no_text",
-        "no text",
-        "none text",
-        " ",
-        "  ",
-        "(dummyText)"
-    )
+    to_ignore = ("%null%", "no_text", "no text", "none text", " ", "  ", "(dummyText)")
 
     in_check = (
-        "#c", "&lt", "&gt", "multiplayer", "session", "NAT", "PSN", "network", "service",
-        "DARK SOULS", "SEKIRO", "amiibo", "settings", "menu"
+        "#c",
+        "&lt",
+        "&gt",
+        "multiplayer",
+        "session",
+        "NAT",
+        "PSN",
+        "network",
+        "service",
+        "DARK SOULS",
+        "SEKIRO",
+        "amiibo",
+        "settings",
+        "menu",
     )
 
-    delimeters = (
-        ".", "?", "!", ",", "..."
-    )
+    delimeters = (".", "?", "!", ",", "...")
     for text_elem in entries_elem:
         text = text_elem.text
         if any((text == ignore for ignore in to_ignore)):
