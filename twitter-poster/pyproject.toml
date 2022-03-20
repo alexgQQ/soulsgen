@@ -6,11 +6,14 @@ authors = ["alexgQQ <alex.grand@beatport.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pydantic = "^1.9.0"
 requests-oauthlib = "^1.3.1"
+pydantic = "1.7.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
+
+[tool.poetry.scripts]
+twitter = "twitter.main:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

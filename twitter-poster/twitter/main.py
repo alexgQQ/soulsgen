@@ -111,8 +111,9 @@ def generate_access_key() -> None:
     print(f"TWITTER_TOKEN_SECRET={access_token_secret}")
 
 
-if __name__ == "__main__":
-
+# Internal conflict on whether to change this to click
+# or keep using built in argparse to slim image :D:
+def main():
     parser = argparse.ArgumentParser(
         description="Handle twitter operations for soulsgen."
     )
@@ -134,3 +135,7 @@ if __name__ == "__main__":
         logging.info("Fetched message '%s' from source", sentence["result"])
         twitter_post(sentence["result"])
         logging.info("Soulsgen post complete!")
+
+
+if __name__ == "__main__":
+    main()
