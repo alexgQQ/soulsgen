@@ -5,74 +5,41 @@ This uses text entries from the games and trains agains a GPT2 language model.
 This is then accessed through torchserve to create a mostly nonsensical, dark souls-y sentence.
 Using a simple cronjob I then automatically post these to twitter.
 
-## Setup
+## Install
 
 This requires [poetry](https://python-poetry.org/docs/#installation) to use.
-A few env configs must be provided as well, I recommend to make a .env file as below:
+There are some poetry bugs around Cython packages, so for now they can be
+worked around by manually installing. Additionally the spacy english core
+module must be downloaded.
+
 ```bash
-# Can take these as is
-export GPT2_VOCAB_PATH=serve-handler/assets/vocab.txt
-export GPT2_CORPUS_PATH=serve-handler/assets/corpus.txt
-export TRAINER_NAME=soulsgen-trainer
-export TRAINER_ZONE=us-central1-a
-
-# Replace this with registry named location for ez use
-export TWITTER_IMAGE_NAME=soulsgen-twitter:latest
-
-# Specify where to pull models and data
-export BUCKET=gs://gcp-bucket-to-use
-export DATASOURCE_DIR=/path/to/source/xmls
-export TORCHSERVE_ENDPOINT=hostname/to/torchserve
-
-# Specify base twitter auth secrets
-export TWITTER_CONSUMER_KEY=<twitter dev api key>
-export TWITTER_CONSUMER_SECRET=<twitter dev api secret>
-
-# Fill these in from twitter 'token' command below
-# Should only need to generate this once or if changing account
-export TWITTER_ACCESS_TOKEN=<generated from twitter bot>
-export TWITTER_TOKEN_SECRET=<generated from twitter bot>
+poetry install  # This will fail but installs most packages
+poetry run pip install Cython
+poetry install
+poetry run python -m spacy download en_core_web_sm
 ```
 
-## Commands
+## Run
 
+The commands will be installed as a cli script and offer various utils for various operations.
+For a general overview:
 ```bash
-# Install local python deps
-./manage install
+poetry run soulsgen --help
+poetry run twitter --help
+```
 
-# Build dataset
-./manage create corpus
-# Build dataset
-./manage upload corpus
-# Deploy a VM for training with deps installed
-./manage create trainer
-# startup script in install_trainer.sh will autorun training
-# tune params there as needed
+### Env Setup
 
-# Build torchserve assets
-./manage create archive
-# or download current torchserve assets
-./manage download archive
-
-# Test torchserve handler directly
-poetry run python serve-handler/src/test.py
-# Test it with an actual torchserve instance
-./manage run
-
-# Upload if it checks out
-./manage upload archive
-# Place archive in k8s nfs location
-
-# Generate access tokens
-./manage create token
-# Test a post
-poetry run python twitter-poster/twitter/main.py post
-# Build twitter poster image
-./manage create image
-# Push poster image
-./manage upload image
-# Deploy cronjob
-./manage create cronjob
+The cli will take these arguments, but many can be loaded as env vars or via a .env file.
+```
+CONTAINER_REG=container.registry.host
+BUCKET=gcp-bucket-to-use
+DATASOURCE_DIR=/path/to/source/xmls
+TORCHSERVE_ENDPOINT=hostname/to/torchserve
+TWITTER_CONSUMER_KEY=<twitter dev api key>
+TWITTER_CONSUMER_SECRET=<twitter dev api secret>
+TWITTER_ACCESS_TOKEN=<generated from twitter command>
+TWITTER_TOKEN_SECRET=<generated from twitter command>
 ```
 
 ## Dataset
@@ -85,7 +52,7 @@ Gathering the data to work with consists of a few steps:
 
 ### Gathering Data
 
-This data was pulled from the three Dark Souls games installed via steam. This is largely a manual process as of now.
+This data was pulled from the three Dark Souls games and Sekiro installed via steam. This is largely a manual process as of now.
 An outline of the steps for reference:
 
 * Unpack base game files
@@ -103,8 +70,7 @@ An outline of the steps for reference:
 The resulting xml file will be the text entries for various entities. These files contain menu messages, npc dialogue, item names etc. Every string literal.
 
 TODOS:
-    - Gather more data points, I have only used specific sets (item descriptions, game openning dialoge, class descriptions) from DS1-3.
-    - Automating this would be awesome, but tricky given how random the file placement is.
+    * Automating this would be awesome, but tricky given how random the file placement is.
 
 ### Parse this crazy XML
 
@@ -121,9 +87,6 @@ A good chunk of manual digging had to be done to identity some pieces of interes
 
 The module `extension` will handle a lot of this parsing and cleaning. Check out its source for implementation details.
 
-TODOS:
-    - Come up with a way to validate entries are indeed clean, hard to manually validate.
-
 ### Build our Corpus (Dataset)
 
 Corpus is a term for a set of language snippets. This is just another reference for the dataset to work off of.
@@ -131,8 +94,8 @@ Here I use a corpus building tool [Expanda](https://github.com/affjljoo3581/Expa
 **This is no longer in active maintenece and is a bit old, but there are not many tools for this**
 
 This tool really just takes a set of files, parses them, tokenizes each word and builds a vocabulary set with a training and testing set.
-It is meant to use custom modules to handle specific parsing cases. The `extension.darksouls` module is used to parse these files, clean and tokenize them.
-It then feeds the results to exapanda to create the dataset.
+It is meant to use custom modules to handle specific parsing cases. The `soulsgen.parse` module is used to parse these files, clean and tokenize them.
+It then feeds the results to exapanda to create the dataset. After parsing, we can run a short report on some of the words with the `soulsgen inspect` command. This relays information on the sentence lengthe and structure for a quick glance at the dataset.
 
 TODOS:
     - Fork and update expanda to work with newer tokenizer libraries.
@@ -167,6 +130,47 @@ the raw sentences and save them to a text file.
 
 Another approach I tried was to use a random letter, generate the sentence, and find the closest word it tried to make from that first letter from my vocab set using a [Levenshtein](https://pypi.org/project/Levenshtein/) distance. Was interesting but felt needlessly complicated.
 
+### Evaluation
+
+While training will give metrics on how well a model is doing, I still want to compare generated text with the source corpus.
+Once a model is trained, I simply generate a sample set of sentences with torchserve and run the same lexical report as I would for the source text.
+This gives me a good idea if the sentence breakdown is similar, however the process is a bit slow. Running this on CPU alone gets ~1.8 seconds/sentence.
+I can get much better performance running this on my GPU through my windows machine.
+
+### Installing for Windows
+
+Run through this guide for [torchserve on windows.](https://github.com/pytorch/serve/blob/master/docs/torchserve_on_win_native.md)
+A few notes:
+* The `nvidia-smi.exe` exec provided by nvidia is not in the referenced location, just do a file search for it.
+* We must explicitly install the latest cuda libraries that come with conda, so when installing deps do:
+    ```
+    python .\ts_scripts\install_dependencies.py --environment=prod --cuda cu111
+    ```
+
+After that, copy over the soulgen service handler and the dataset assets. Then create a config.properties file with `number_of_gpu=1`.
+There should be a dir structure like:
+```
+.
+├── model_store
+│   └── soulsgen.mar
+├── assets
+│   ├── vocab.txt
+|   └── words.txt
+└── config.properties
+```
+
+Run the following in the conda shell
+```batch
+SET GPT2_VOCAB_PATH=assets\vocab.txt
+SET GPT2_CORPUS_PATH=assets\words.txt
+torchserve --start --ncs --model-store model_store --ts-config config.properties --model soulsgen.mar
+```
+
+There may be some error output for the metrics server, an odd formatting bug, but does not interfere with inference.
+This will, by default, register 4 worker processes for the model and sending batch jobs to match the worker count
+had the best performance, around 0.5 seconds/sentence.
+
+
 ### Serving
 
 A while back I put up a torchserve instance for doing inference over the web. It works decent enough and is meant to have plugable models so you can serve various models. The infrastructure for this is located on another repo of mine [here](https://github.com/alexgQQ/gke-tutorial).
@@ -178,10 +182,6 @@ What is stored here is the handler setup for the edge inference, under `serve-ha
 
 The current code for this is an adaptation from the trainer code, stripped down to only what is needed for generation.
 **Due to how serve unpacks the files, the related modules are imported in a flat structure for relative imports** 
-
-TODOS:
-    - Its a bit slow, ~4s req time, profile and try to improve.
-    - (A bit out of scope) Add grafana/prometheus source for serve
 
 ### Twitter Bot
 
